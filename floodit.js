@@ -1,5 +1,5 @@
-var HEIGHT = 12;
-var WIDTH = 12;
+var HEIGHT = 15;
+var WIDTH = 15;
 var COLORS = ["red","green","blue","yellow","pink","purple"];
 
 function getRandomColor() {
@@ -30,7 +30,11 @@ function displayBoard() {
   for (var x=0; x<board.length; x++) {
     var row = board[x];
     for (var y=0; y<row.length; y++) {
-      ctx.fillStyle = COLORS[row[y]];
+      if (row[y] == -1) {
+        ctx.fillStyle = "white";
+      } else {
+        ctx.fillStyle = COLORS[row[y]];
+      }
       ctx.fillRect(x*squareWidth, y*squareHeight, (x+1)*squareWidth, (y+1)*squareHeight);
     }
   }
@@ -91,7 +95,11 @@ function newFilledArray(length, val) {
 
 function playStrategy(strategy) {
   if (!won()) {
-    fill(strategy());
+    var playNext = strategy();
+    if (playNext == -1) {
+      return;
+    }
+    fill(playNext);
     ai = setTimeout(function() { playStrategy(strategy); }, 100);
   }
 }
@@ -180,6 +188,7 @@ function prominent() {
   }
   return maxIndex(colorProminence);
 }
+prominent.description = "Looks at the border of the current flooded area and picks the color that is most common.";
 
 function getNumColors() {
   var colorProminence = newFilledArray(COLORS.length, 0);
@@ -206,14 +215,102 @@ function biggestBang() {
   }
   return maxIndex(area); 
 }
+biggestBang.description = "Finds which color gets you the largest contiguous area, and plays it";
 
-strategies = ["inOrder", "random", "prominent", "biggestBang"]
+function diagonal() {
+  var startColor = board[0][0];
+  var x=0;
+  var y=0;
+  while (y<HEIGHT && board[x][y] == startColor) {
+    x++;
+    if (x>=WIDTH || board[x][y] != startColor) {
+      break;
+    }
+    y++;
+  }
+  if (y>=HEIGHT || x>=WIDTH) {
+    return -1;
+  }
+  return board[x][y];
+}
+
+function getSizeMap() {
+  // finds largest contigous unfilled area on board
+  var filled = getFilledCoordinates(0,0);
+  var areas = {};
+  var removables = {};
+  for (var x=0; x<WIDTH; x++) {
+    for (var y=0; y<HEIGHT; y++) {
+      var coord = x+","+y;
+      if (!(coord in filled) && !(coord in removables)) {
+        var fillData = getFilledCoordinates(x,y);
+        for (r in fillData) {
+          removables[r] = true;
+        }
+        var size = fillData.length;
+        areas[coord] = size;
+      }
+    }
+  }
+  return areas;
+}
+
+function digger() {
+  var areas = getSizeMap();
+  var parts = maxIndex(areas).split(",");
+  flash(parseInt(parts[0]),parseInt(parts[1]));
+  return -1;
+}
+
+function largeAreas() {
+  var areas = getSizeMap();
+  var b1 = copyBoard(board);
+  for (coord in areas) {
+    if (areas[coord] > 2) {
+      var parts = coord.split(",");
+      console.log(parts);
+      floodWhite(parseInt(parts[0]),parseInt(parts[1]));
+    }
+  }
+  var b2 = copyBoard(board);
+  switchBoards(8, b1, b2);
+  return -1;
+}
+
+function switchBoards(times, orig, temp) {
+  if (times % 2) {
+    board = temp;
+  } else {
+    board = orig;
+  }
+  displayBoard();
+  if (times == 0) {
+    return;
+  }
+  setTimeout(function() {switchBoards(times-1, orig, temp)}, 300);
+}
+
+function floodWhite(x,y) {
+  flood(x,y,board[x][y],-1);
+}
+
+function flash(x,y) {
+  var b1 = copyBoard(board);
+  floodWhite(x,y);
+  displayBoard();
+  var b2 = copyBoard(board);
+  switchBoards(8,b1,b2);
+}
+
+strategies = [inOrder, random, prominent, biggestBang, diagonal, largeAreas]
 
 function displayStrategies() {
   var bdiv = $("#ai");
   for (i in strategies) {
     var strategy = strategies[i];
-    bdiv.append($("<button onclick='playStrategy(" + strategy + ")'>" + strategy + "</button>"));
+    var button = $("<button onclick='playStrategy(" + strategy.name + ")'>" + strategy.name + "</button>");
+    if (strategy.description) button.attr("title",strategy.description);
+    bdiv.append(button);
   }
 }
 

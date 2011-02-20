@@ -1,0 +1,22 @@
+<html>
+	<head>
+		<title>FloodIt AI</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.0/jquery.min.js"></script>
+		<script src="floodit.js"></script>
+	</head>
+	<body>
+		<div id="stats">
+			Moves: <span id="moves">0</span>
+		</div>
+		<canvas id="canvas" width="204" height="204"></canvas>
+		<div id="buttons"></div>
+		<div id="ai">
+		</div>
+		<div id="control">
+			<button onclick="stop();">Stop</button>
+			<button onclick="reset();">Reset</button>
+			<button onclick="newBoard();">New Board</button>
+			<button onclick="undo();">Undo</button>
+		</div>
+	</body>
+</html>

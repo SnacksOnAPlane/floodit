@@ -2,6 +2,50 @@ var HEIGHT = 15;
 var WIDTH = 15;
 var COLORS = ["red","green","blue","yellow","pink","purple"];
 
+function Point(x,y) {
+  this.x = x;
+  this.y = y;
+  this.toString = function() {
+    return x+","+y;
+  }
+}
+
+function PointsList() {
+  var _list = {};
+  var _size = 0;
+  this.add = function(pt) {
+    assert(pt instanceof Point);
+    _list[pt.toString()] = pt;
+    _size += 1;
+  };
+  this.addList = function(ptlist) {
+    assert(ptlist instanceof PointsList);
+    for (pt in ptlist.list) {
+      this.add(ptlist.list[pt]);
+    }
+  }
+  this.contains = function(pt) {
+    assert(pt instanceof Point);
+    return pt.toString() in _list;
+  }
+  this.size = function() {
+    return _size;
+  }
+  this.list = _list;
+}
+
+function Blob(points) {
+  assert(points instanceof PointsList);
+  assert(points.size() > 0);
+  this.points = points;
+  this.size = this.points.size();
+  this.toString = function() {
+    return "Blob (" + this.size + "): " + this.points.list;
+  }
+}
+
+var ORIGIN = new Point(0,0);
+
 function getRandomColor() {
   return Math.floor(Math.random() * COLORS.length);
 }
@@ -119,67 +163,71 @@ function maxIndex(arr) {
   return maxIdx;
 }
 
-function getFilledCoordinates(sx,sy) {
-  var color = board[sx][sy];
-  var coords = {};
-  coords.length = 0;
-  var tried = {}
-  function mapper(x,y) {
+function getFilledCoordinates(startPoint) {
+  assert(startPoint instanceof Point);
+  var color = board[startPoint.x][startPoint.y];
+  var coords = new PointsList();
+  var tried = new PointsList();
+  function mapper(point) {
+    var x = point.x;
+    var y = point.y;
     if (x<0 || y<0 || x>=WIDTH || y>=HEIGHT) {
       return;
     }
-    var coord = x+","+y;
-    if (tried[coord]) {
+    if (tried.contains(point)) {
       return;
     }
-    tried[coord] = true;
+    tried.add(point);
     if (board[x][y] == color) {
-      coords[coord] = true;
-      coords.length += 1;
+      coords.add(point);
     } else {
       return;
     }
-    mapper(x-1,y);
-    mapper(x+1,y);
-    mapper(x,y+1);
-    mapper(x,y-1);
+    mapper(new Point(x-1,y));
+    mapper(new Point(x+1,y));
+    mapper(new Point(x,y+1));
+    mapper(new Point(x,y-1));
   }
-  mapper(sx,sy);
+  mapper(startPoint);
+  assert(coords.size() > 0);
   return coords;
 }
 
-function getEdgeCoordinates(sx,sy) {
-  var color = board[sx][sy];
-  var coords = {};
-  coords.length = 0;
-  var tried = {}
-  function mapper(x,y) {
+/*
+ * Given a point, returns a pointslist of its edge coordinates
+ */
+function getEdgeCoordinates(startPoint) {
+  assert(startPoint instanceof Point);
+  var color = board[startPoint.x][startPoint.y];
+  var coords = new PointsList();
+  var tried = new PointsList();
+  function mapper(point) {
+    var x = point.x;
+    var y = point.y;
     if (x<0 || y<0 || x>=WIDTH || y>=HEIGHT) {
       return;
     }
-    var coord = x+","+y;
-    if (tried[coord]) {
+    if (tried.contains(point)) {
       return;
     }
-    tried[coord] = true;
+    tried.add(point);
     if (board[x][y] != color) {
-      coords[coord] = true;
-      coords.length += 1;
+      coords.add(point);
       return;
     }
-    mapper(x-1,y);
-    mapper(x+1,y);
-    mapper(x,y+1);
-    mapper(x,y-1);
+    mapper(new Point(x-1,y));
+    mapper(new Point(x+1,y));
+    mapper(new Point(x,y+1));
+    mapper(new Point(x,y-1));
   }
-  mapper(sx,sy);
+  mapper(startPoint.x,startPoint.y);
   return coords;
 }
 
 function prominent() {
   var startColor = board[0][0];
   var colorProminence = newFilledArray(COLORS.length, 0);
-  var edgeCoords = getEdgeCoordinates(0,0);
+  var edgeCoords = getEdgeCoordinates(ORIGIN);
   for (coord in edgeCoords) {
     var parts = coord.split(",");
     var x = parts[0];
@@ -206,10 +254,11 @@ function getNumColors() {
 function biggestBang() {
   var startBoard = copyBoard(board);
   var area = newFilledArray(COLORS.length, 0);
+  var startPoint = new Point(0,0);
   for (i in COLORS) {
     if (i != board[0][0]) {
       flood(0,0,board[0][0],i);
-      area[i] = getFilledCoordinates(0,0).length;
+      area[i] = getFilledCoordinates(startPoint).length;
     }
     board = copyBoard(startBoard);
   }
@@ -234,25 +283,33 @@ function diagonal() {
   return board[x][y];
 }
 
+function AssertException(message) { this.message = message; }
+AssertException.prototype.toString = function () {
+  return 'AssertException: ' + this.message;
+}
+
+function assert(exp, message) {
+  if (!exp) {
+    throw new AssertException(message);
+  }
+}
+
 function getSizeMap() {
   // finds largest contigous unfilled area on board
-  var filled = getFilledCoordinates(0,0);
-  var areas = {};
-  var removables = {};
+  var filled = getFilledCoordinates(ORIGIN);
+  var blobs = [];
+  var removables = new PointsList();
   for (var x=0; x<WIDTH; x++) {
     for (var y=0; y<HEIGHT; y++) {
-      var coord = x+","+y;
-      if (!(coord in filled) && !(coord in removables)) {
-        var fillData = getFilledCoordinates(x,y);
-        for (r in fillData) {
-          removables[r] = true;
-        }
-        var size = fillData.length;
-        areas[coord] = size;
+      var point = new Point(x,y);
+      if (!(filled.contains(point)) && !(removables.contains(point))) {
+        var fillData = getFilledCoordinates(point);
+        blobs.push(new Blob(fillData));
+        removables.addList(fillData);
       }
     }
   }
-  return areas;
+  return blobs;
 }
 
 function digger() {
@@ -262,15 +319,24 @@ function digger() {
   return -1;
 }
 
-function largeAreas() {
+function findLargeAreas(lowerLimit) {
+  console.log("findLargeAreas " + lowerLimit);
+  var retme = {};
   var areas = getSizeMap();
-  var b1 = copyBoard(board);
   for (coord in areas) {
-    if (areas[coord] > 2) {
-      var parts = coord.split(",");
-      console.log(parts);
-      floodWhite(parseInt(parts[0]),parseInt(parts[1]));
+    if (areas[coord] >> lowerLimit) {
+      retme[coord] = true;
     }
+  }
+  return retme;
+}
+
+function largeAreas() {
+  var b1 = copyBoard(board);
+  for (coord in findLargeAreas(3)) {
+    console.log(coord);
+    var parts = coord.split(",");
+    floodWhite(parseInt(parts[0]),parseInt(parts[1]));
   }
   var b2 = copyBoard(board);
   switchBoards(8, b1, b2);

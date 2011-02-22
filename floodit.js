@@ -360,7 +360,6 @@ function findLargeBlobs(lowerLimit) {
 function expandFloodedByOne() {
   var color = board[0][0];
   var edges = getEdgeCoordinates(ORIGIN);
-  edges.mark("E");
   for (i in edges.list) {
     var point = edges.list[i];
     board[point.x][point.y] = color;
@@ -410,6 +409,7 @@ function largeAreas2() {
   var bestBlobPoint = null;
   var bestSize = 0;
   // always explore to 3...discount for distance
+  flood(0,0,board[0][0],-1);
   for (var i=0;i<3;i++) {
     var outerEdges = expandFloodedByOne();
     var touchedBlobPoint = getTouchedBlobPoint(outerEdges, largeBlobs);
@@ -468,7 +468,6 @@ function floodWhite(blob) {
 
 function edger() {
   var edges = getEdgeCoordinates(ORIGIN);
-  edges.mark("E");
   return -1;
 }
 
